@@ -64,6 +64,8 @@ int write_bw_log = 0;
 int read_only = 0;
 int status_interval = 0;
 
+int read_verify = 0;
+
 char *trigger_file = NULL;
 long long trigger_timeout = 0;
 char *trigger_cmd = NULL;
@@ -267,6 +269,11 @@ static struct option l_opts[FIO_NR_OPTIONS] = {
 		.name		= (char *) "aux-path",
 		.has_arg	= required_argument,
 		.val		= 'K',
+	},
+	{
+		.name		= (char *) "verify-read",
+		.has_arg	= no_argument,
+		.val		= 'Z',
 	},
 	{
 		.name		= NULL,
@@ -2709,6 +2716,9 @@ int parse_cmd_line(int argc, char *argv[], int client_type)
 				exit_val = 1;
 			}
 			trigger_timeout /= 1000000;
+			break;
+		case 'Z':
+			++read_verify;
 			break;
 		case '?':
 			log_err("%s: unrecognized option '%s'\n", argv[0],

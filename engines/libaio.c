@@ -58,6 +58,8 @@ static struct fio_option options[] = {
 	},
 };
 
+extern int read_verify; // SAM DBG
+
 static inline void ring_inc(struct libaio_data *ld, unsigned int *val,
 			    unsigned int add)
 {
@@ -73,9 +75,11 @@ static int fio_libaio_prep(struct thread_data fio_unused *td, struct io_u *io_u)
 
 	if (io_u->ddir == DDIR_READ)
 		io_prep_pread(&io_u->iocb, f->fd, io_u->xfer_buf, io_u->xfer_buflen, io_u->offset);
-	else if (io_u->ddir == DDIR_WRITE)
+	else if (io_u->ddir == DDIR_WRITE) {
 		io_prep_pwrite(&io_u->iocb, f->fd, io_u->xfer_buf, io_u->xfer_buflen, io_u->offset);
-	else if (ddir_sync(io_u->ddir))
+		if (read_verify)
+			*(unsigned long *)(io_u->xfer_buf) = io_u->offset; // SAM DBG
+	} else if (ddir_sync(io_u->ddir))
 		io_prep_fsync(&io_u->iocb, f->fd);
 
 	return 0;
@@ -95,8 +99,19 @@ static struct io_u *fio_libaio_event(struct thread_data *td, int event)
 			io_u->error = -ev->res;
 		else
 			io_u->resid = io_u->xfer_buflen - ev->res;
-	} else
+	} else {
 		io_u->error = 0;
+
+		/* SAM DBG */
+		if (read_verify)
+			if (*(unsigned long *)(io_u->xfer_buf) != io_u->offset) {
+				if (read_verify > 1)
+					fprintf(stderr, "VERIFY FAILED %lx != %llx\n",
+							*(unsigned long *)(io_u->xfer_buf), io_u->offset);
+				io_u->error = EINVAL;
+			}
+		/* SAM DBG */
+	}
 
 	return io_u;
 }
